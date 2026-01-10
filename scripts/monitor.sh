@@ -1,7 +1,10 @@
 #!/bin/bash
 
+# Load common helper
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+source "$SCRIPT_DIR/common.sh"
+
 # Configuration
-ARDUINO_CLI="C:/Users/Jeff/AppData/Local/Programs/Arduino IDE/resources/app/lib/backend/resources/arduino-cli.exe"
 PORT="COM4"
 BAUDRATE="115200"
 
