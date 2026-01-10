@@ -1,0 +1,8 @@
+# Arduino build artifacts
+build/
+bin/
+
+# Private/Local files
+.gemini/
+*.local
+run_arduino.ps1
