@@ -11,16 +11,17 @@ DFRobotDFPlayerMini myDFPlayer;
 DFPlayerWrapper playerWrapper(myDFPlayer);
 Mp3Controller mp3Controller(playerWrapper);
 
+// Button pin definitions
+#define EXTEND_BUTTON_PIN D4
+#define RETRACT_BUTTON_PIN D5
+
 // Relay pin definitions
 #define RELAY1_PIN D2 // Connected to IN1
 #define RELAY2_PIN D3 // Connected to IN2
 
 // Actuator
 Actuator actuator(RELAY1_PIN, RELAY2_PIN);
-
-// Button pin definitions
-#define EXTEND_BUTTON_PIN D4
-#define RETRACT_BUTTON_PIN D5
+ActuatorState lastState = ACTUATOR_STOPPED;
 
 void setup() {
   Serial.begin(115200);
@@ -29,7 +30,7 @@ void setup() {
   while (!Serial && millis() < 5000)
     ;
 
-  Serial.println("Serial initialized!");
+  Serial.println(F("Chicken Coop Automation Starting..."));
 
   // Initialize Actuator
   actuator.begin();
@@ -37,33 +38,32 @@ void setup() {
   // Initialize Button Pins (using internal pull-up)
   pinMode(EXTEND_BUTTON_PIN, INPUT_PULLUP);
   pinMode(RETRACT_BUTTON_PIN, INPUT_PULLUP);
-
-  // Ensure relays are OFF initially
   actuator.stop();
 
+  Serial.println(F("Initializing RTC..."));
   if (!rtc.begin()) {
-    Serial.println("Couldn't find RTC - Check your SDA/SCL wiring!");
-    while (1)
-      ;
-  }
-
-  rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-
-  // Initialize Mp3 Player
-  // Note: Serial0 is used for DFPlayer on Nano ESP32 (D0/D1)
-  Serial0.begin(9600);
-  if (!mp3Controller.begin(Serial0)) {
-    Serial.println("Unable to begin Mp3Controller:");
-    Serial.println("1.Please recheck the connection!");
-    Serial.println("2.Please insert the SD card!");
+    Serial.println(F("ERROR: Couldn't find RTC - Check SDA/SCL wiring!"));
+    // Don't hang here during debug, just continue
   } else {
-    Serial.println("Mp3Controller online.");
+    Serial.println(F("RTC initialized."));
+    if (rtc.lostPower()) {
+      Serial.println(F("RTC lost power, setting time!"));
+      rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    }
   }
+
+  if (!mp3Controller.begin(Serial0)) {
+    Serial.println(F("Mp3Player: Failed to initialize."));
+  } else {
+    Serial.println(F("Mp3Player: Online."));
+  }
+
+  Serial.println(F("Setup Complete."));
 }
 
 void openCoop() {
   if (actuator.getState() != ACTUATOR_OPENING) {
-    Serial.println("Opening Coop...");
+    Serial.println(F(">>> STATE CHANGE: OPENING"));
     mp3Controller.playTrack(1); // Play track 1 for opening
   }
   actuator.open();
@@ -71,7 +71,7 @@ void openCoop() {
 
 void closeCoop() {
   if (actuator.getState() != ACTUATOR_CLOSING) {
-    Serial.println("Closing Coop...");
+    Serial.println(F(">>> STATE CHANGE: CLOSING"));
     mp3Controller.playTrack(2); // Play track 2 for closing
   }
   actuator.close();
@@ -79,22 +79,24 @@ void closeCoop() {
 
 void stopActuator() {
   if (actuator.getState() != ACTUATOR_STOPPED) {
-    Serial.println("Stopping Actuator.");
+    Serial.println(F(">>> STATE CHANGE: STOPPED"));
   }
   actuator.stop();
 }
 
 void loop() {
+  int btnOpen = digitalRead(EXTEND_BUTTON_PIN);
+  int btnClose = digitalRead(RETRACT_BUTTON_PIN);
 
   // Manual Button Control
-  if (digitalRead(EXTEND_BUTTON_PIN) == LOW) {
+  if (btnOpen == LOW) {
     openCoop();
-  } else if (digitalRead(RETRACT_BUTTON_PIN) == LOW) {
+  } else if (btnClose == LOW) {
     closeCoop();
   } else {
     stopActuator();
   }
 
   mp3Controller.update();
-  delay(100); // Faster polling for buttons
+  delay(50); // Small polling delay
 }
